@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        background-color: #f4f4f4;
+        color: #333;
+    }
+
+    h1 {
+        text-align: center;
+        color: #444;
+    }
+
+    form {
+        background-color: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    label {
+        font-weight: bold;
+        margin-bottom: 5px;
+        /* display: block; */
+    }
+
+    input[type="text"],
+    textarea {
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 15px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+    }
+
+    textarea {
+        resize: vertical;
+    }
+
+    button {
+        background-color: #007bff;
+        color: white;
+        padding: 10px 15px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 1em;
+        margin: 5px;
+    }
+
+    button:hover {
+        background-color: #0056b3;
+    }
+
+    #result {
+        margin-top: 20px;
+        background-color: #fff;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        min-height: 100px;
+    }
+
+    div {
+        flex: 1;
+        /* padding: 10px; */
+    }
+
+    .container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5em;
+    }
+</style>
+
+<body>
+    <h1>Bookshop</h1>
+    <div style="display: flex; gap: 5em;">
+        <div>
+            <form id="bookShop">
+                <h4>Add new?</h4>
+                <br>
+                <label for="title">Title</label>
+                <input type="text" id="title" name="title" required>
+                <br>
+                <label for="author">Author</label>
+                <input type="text" id="author" name="author" required>
+                <br>
+                <input type="radio" id="genre" name="genre" value="0" checked>
+                <label for="fiction">Fiction</label>
+                <br>
+                <input type="radio" id="genre" name="genre" value="1">
+                <label for="nonFiction">NonFiction</label>
+                <br>
+                <input type="radio" id="genre" name="genre" value="2">
+                <label for="mystery">Mystery</label>
+                <br>
+                <input type="radio" id="genre" name="genre" value="3">
+                <label for="fantasy">Fantasy</label>
+                <br>
+                <input type="radio" id="genre" name="genre" value="4">
+                <label for="romance">Romance</label>
+                <br>
+                <label for="ISBN">ISBN</label>
+                <input type="text" id="ISBN" name="ISBN" required>
+                <br>
+                <label for="description">Description</label>
+                <textarea name="description" id="description"></textarea>
+                <br>
+                <button type="submit">Add!</button>
+            </form>
+
+            <button id="showAll">Show all</button>
+
+        </div>
+        <div>
+            <h4>Find some books by:</h4>
+            <br>
+            <label for="findTitle">Title</label>
+            <input type="text" id="findTitle" name="findTitle">
+            <button id="findTitleButton">Find!</button>
+            <br>
+            <label for="findAuthor">Author</label>
+            <input type="text" id="findAuthor" name="findAuthor">
+            <button id="findAuthorButton">Find!</button>
+            <br>
+            <label for="findISBN">ISBN</label>
+            <input type="text" id="findISBN" name="findISBN">
+            <button id="findISBNButton">Find!</button>
+            <br>
+            <label for="findRegex">Regex</label>
+            <input type="text" id="findRegex" name="findRegex">
+            <button id="findRegexButton">Find!</button>
+        </div>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        document.getElementById('bookShop').addEventListener('submit', async function (event) {
+            event.preventDefault();
+
+            const resultDiv = document.getElementById('result');
+
+            try {
+                const title = document.getElementById('title').value;
+                const author = document.getElementById('author').value;
+                const genres = document.getElementsByName('genre');
+                var genre = '';
+                for (i = 0; i < genres.length; i++) {
+                    if (genres[i].checked)
+                        genre = Number(genres[i].value);
+                }
+                const description = document.getElementById('description').value;
+
+                const ISBN = document.getElementById('ISBN').value;
+                checkISBN(ISBN);
+
+                const response = await fetch(`http://localhost:5177/api/bookshop/send_one`, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        id: 0,
+                        title: title,
+                        author: author,
+                        genre: genre,
+                        isbn: ISBN,
+                        description: description
+                    })
+                })
+                if (!response.ok) {
+                    throw new Error('Failed to fetch sending book');
+                }
+                const result = await response.json();
+                const stringResult = result.map((book) => {
+                    return `${book.title} - ${book.author} - ${book.description} - ${book.genre} - ${book.isbn}`;
+                }).join("<br>");
+                resultDiv.innerHTML = stringResult;
+            } catch (error) {
+                resultDiv.textContent = 'Error: ' + error.message;
+            }
+        });
+
+        async function checkISBN(ISBN) {
+            const regex = /^\d{3}-\d-\d{2}-\d{6}-\d$/;
+            const found = ISBN.match(regex);
+            if (found != ISBN) {
+                throw new Error('Incorrect ISBN: ISBN format: XXX-X-XX-XXXXXX-X (3-1-2-6-1)');
+            }
+            const allBooks = await fetch(`http://localhost:5177/api/bookshop/getAll`);
+            if (!allBooks.ok) {
+                throw new Error('Failed to fetch bookshop');
+            }
+            const allBooksResult = await allBooks.json();
+            var isDoubled = false;
+            allBooksResult.map(book => {
+                isDoubled = ISBN == book.isbn;
+            });
+            if (isDoubled) {
+                throw new Error('ISBN must be unique');
+            }
+        }
+
+        document.getElementById('showAll').addEventListener('click', async function () {
+            event.preventDefault();
+            const resultDiv = document.getElementById('result');
+            try {
+                const response = await fetch(`http://localhost:5177/api/bookshop/get_all`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch bookshop');
+                }
+                if(response.status != 200) {
+                    resultDiv.innerHTML = 'No such element!'
+                    return
+                }
+                const result = await response.json();
+                const stringResult = result.map((book) => {
+                    return `${book.title} - ${book.author} - ${book.description} - ${book.genre} - ${book.isbn}`;
+                }).join("<br>");
+                resultDiv.innerHTML = stringResult;
+            } catch (error) {
+                resultDiv.textContent = 'Error: ' + error.message;
+            }
+        });
+
+        document.getElementById('findTitleButton').addEventListener('click', async function () {
+            event.preventDefault();
+            const resultDiv = document.getElementById('result');
+            const title = document.getElementById('findTitle').value;
+            try {
+                const response = await fetch(`http://localhost:5177/api/bookshop/find_by_title/${encodeURIComponent(title)}`, {
+                    method: 'POST'
+                });
+                if (!response.ok) {
+                    throw new Error('Failed to fetch bookshop');
+                }
+                if(response.status != 200) {
+                    resultDiv.innerHTML = 'No such element!'
+                    return
+                }
+                const book = await response.json();
+                resultDiv.innerHTML = `${book.title} - ${book.author} - ${book.description} - ${book.genre} - ${book.isbn}`;
+            } catch (error) {
+                resultDiv.textContent = 'Error: ' + error.message;
+            }
+        });
+
+        document.getElementById('findAuthorButton').addEventListener('click', async function () {
+            event.preventDefault();
+            const resultDiv = document.getElementById('result');
+            const author = document.getElementById('findAuthor').value;
+            try {
+                const response = await fetch(`http://localhost:5177/api/bookshop/find_by_author/${encodeURIComponent(author)}`, {
+                    method: 'POST'
+                });
+                if (!response.ok) {
+                    throw new Error('Failed to fetch bookshop');
+                }
+                if(response.status != 200) {
+                    resultDiv.innerHTML = 'No such element!'
+                    return
+                }
+                const book = await response.json();
+                resultDiv.innerHTML = `${book.title} - ${book.author} - ${book.description} - ${book.genre} - ${book.isbn}`;
+            } catch (error) {
+                resultDiv.textContent = 'Error: ' + error.message;
+            }
+        });
+
+        document.getElementById('findISBNButton').addEventListener('click', async function () {
+            event.preventDefault();
+            const resultDiv = document.getElementById('result');
+            try {
+                const ISBN = document.getElementById('findISBN').value;
+                checkISBN(ISBN)
+                const response = await fetch(`http://localhost:5177/api/bookshop/find_by_ISBN/${encodeURIComponent(ISBN)}`, {
+                    method: 'POST'
+                });
+                if (!response.ok) {
+                    throw new Error('Failed to fetch bookshop');
+                }
+                if(response.status != 200) {
+                    resultDiv.innerHTML = 'No such element!'
+                    return
+                }
+                const book = await response.json();
+                resultDiv.innerHTML = `${book.title} - ${book.author} - ${book.description} - ${book.genre} - ${book.isbn}`;
+            } catch (error) {
+                resultDiv.textContent = 'Error: ' + error.message;
+            }
+        });
+
+        document.getElementById('findRegexButton').addEventListener('click', async function () {
+            event.preventDefault();
+            const resultDiv = document.getElementById('result');
+            const regex = document.getElementById('findRegex').value;
+            try {
+                const response = await fetch(`http://localhost:5177/api/bookshop/find_by_regex/${encodeURIComponent(regex)}`, {
+                    method: 'POST'
+                });
+                if (!response.ok) {
+                    throw new Error('Failed to fetch bookshop');
+                }
+                if(response.status != 200) {
+                    resultDiv.innerHTML = 'No such element!'
+                    return
+                }
+                const book = await response.json();
+                resultDiv.innerHTML = `${book.title} - ${book.author} - ${book.description} - ${book.genre} - ${book.isbn}`;
+            } catch (error) {
+                resultDiv.textContent = 'Error: ' + error.message;
+            }
+        });
+    </script>
+</body>
+
+</html>
